@@ -1,0 +1,24 @@
+# Build & local runtime caches
+.cache/
+.keisou/
+dist/
+/keisou
+/keisou.exe
+*.test
+*.out
+
+# Generated handoff / failure artifacts
+HANDOFF.md
+BLOCKED_REPORT.md
+
+# Local AI agent configs & phase prompts (dev-only)
+.claude/
+.codex/
+.gemini/
+prompts/
+
+# Secrets & OS junk
+.env
+.env.*
+.DS_Store
+Thumbs.db

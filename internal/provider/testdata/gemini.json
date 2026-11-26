@@ -1,0 +1,26 @@
+{
+  "sessionId": "gemini-session",
+  "startTime": "2026-11-25T19:12:00Z",
+  "messages": [
+    {
+      "id": "user",
+      "timestamp": "2026-11-25T19:12:00Z",
+      "type": "user",
+      "content": "フィクスチャ"
+    },
+    {
+      "id": "a",
+      "timestamp": "2026-11-25T19:13:00Z",
+      "type": "gemini",
+      "model": "gemini-3-pro",
+      "tokens": {"input": 20, "output": 5, "thoughts": 4, "cached": 900}
+    },
+    {
+      "id": "b",
+      "timestamp": "2026-11-25T23:52:00Z",
+      "type": "gemini",
+      "model": "gemini-3-flash",
+      "tokens": {"input": 40, "output": 12, "thoughts": 17}
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{"timestamp":"2026-11-25T18:59:59Z","type":"assistant","message":{"usage":{"input_tokens":9000}}}
+{"timestamp":"2026-11-25T19:02:00Z","type":"assistant","requestId":"req","message":{"id":"msg","model":"claude-sonnet","usage":{"input_tokens":10,"output_tokens":3}}}
+{"timestamp":"2026-11-25T20:03:00Z","type":"assistant","requestId":"req","message":{"id":"msg","model":"claude-opus","usage":{"input_tokens":80,"output_tokens":10,"cache_creation_input_tokens":4,"cache_read_input_tokens":8000}}}
+{"timestamp":"2026-11-25T20:04:00Z","type":"assistant","message":{"id":"msg","usage":{"input_tokens":10}}}
+{"timestamp":

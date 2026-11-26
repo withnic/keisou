@@ -1,0 +1,14 @@
+[
+  {"name":"explicit zero","provider":"claude","record":{"timestamp":"2026-11-25T23:55:00Z","rate_limit":{"5h_utilization":0}},"want":0,"source":"log_exact"},
+  {"name":"below soft","provider":"codex","record":{"timestamp":"2026-11-25T23:55:00Z","payload":{"rate_limits":{"primary":{"used_percent":94.9}}}},"want":94.9,"source":"log_exact"},
+  {"name":"soft","provider":"claude","record":{"created_at":1795650900000,"rate_limit_info":{"utilization":0.95,"rateLimitType":"five_hour"}},"want":95,"source":"log_exact"},
+  {"name":"hard","provider":"gemini","record":{"ts":"2026-11-25T23:55:00Z","remaining_percent":2},"want":98,"source":"log_exact"},
+  {"name":"full","provider":"codex","record":{"timestamp":"2026-11-25T23:55:00Z","rate_limits":{"primary":{"used_percent":100}}},"want":100,"source":"log_exact"},
+  {"name":"expired explicit","provider":"codex","record":{"timestamp":"2026-11-25T23:55:00Z","rate_limits":{"primary":{"used_percent":98,"resets_at":"2026-11-26T00:00:00Z"}}},"want":0,"source":"log_exact"},
+  {"name":"recent 429","provider":"claude","record":{"timestamp":"2026-11-25T23:50:00Z","error":{"status":429}},"want":100,"source":"log_exact"},
+  {"name":"older 429 with future reset","provider":"codex","record":{"timestamp":"2026-11-25T20:00:00Z","payload":{"type":"rate_limit_error","reset_at":"2026-11-26T00:30:00Z"}},"want":100,"source":"log_exact","reset":true},
+  {"name":"expired 429","provider":"gemini","record":{"timestamp":"2026-11-25T23:55:00Z","error":"RESOURCE_EXHAUSTED","resetsAt":"2026-11-25T23:59:00Z"},"want":0,"source":"unavailable"},
+  {"name":"older 429 without reset","provider":"gemini","record":{"timestamp":"2026-11-25T23:49:59Z","error":"RESOURCE_EXHAUSTED"},"want":0,"source":"unavailable"},
+  {"name":"future event","provider":"claude","record":{"timestamp":"2026-11-26T00:00:01Z","error":"rate_limit_error"},"want":0,"source":"unavailable"},
+  {"name":"outside strict window","provider":"claude","record":{"timestamp":"2026-11-25T18:59:59Z","rate_limit":{"5h_utilization":100}},"want":0,"source":"unavailable"}
+]
