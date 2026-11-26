@@ -125,3 +125,51 @@ func TestStatusRejectsInvalidInterval(t *testing.T) {
 		t.Fatalf("bad config got exit %d, stdout %q, stderr %q", code, out.String(), diagnostics.String())
 	}
 }
+
+func TestStatusGraphAndHistoryPersistence(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	codexDir := filepath.Join(dir, "codex")
+	sessionDir := filepath.Join(codexDir, "sessions", "2026", "11", "27")
+	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(dir, "no-logs")
+	t.Setenv("KEISOU_CLAUDE_DIR", missing)
+	t.Setenv("KEISOU_CODEX_DIR", codexDir)
+	t.Setenv("KEISOU_GEMINI_DIR", missing)
+	t.Setenv("KEISOU_ANTIGRAVITY_DIR", missing)
+
+	var out, diagnostics bytes.Buffer
+	if code := run(context.Background(), []string{"--config", path, "init"}, &out, &diagnostics); code != 0 {
+		t.Fatalf("init exit %d: %s", code, &diagnostics)
+	}
+	out.Reset()
+	diagnostics.Reset()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	resetAt := now.Add(3 * time.Hour).Unix()
+	session := filepath.Join(sessionDir, "rollout.jsonl")
+	line := `{"timestamp":"` + now.Format(time.RFC3339) + `","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":42.5,"resets_at":` + jsonInt(resetAt) + `}}}}` + "\n"
+	if err := os.WriteFile(session, []byte(line), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	// --graph renders table + trend/7d sections and persists history.jsonl alongside config.json.
+	if code := run(context.Background(), []string{"status", "--config", path, "--graph"}, &out, &diagnostics); code != 0 {
+		t.Fatalf("status --graph exit %d: %s", code, &diagnostics)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "history.jsonl")); err != nil {
+		t.Fatalf("expected history.jsonl beside config.json: %v", err)
+	}
+	for _, want := range []string{"5h Used", "5h Trend & Limit ETA", "7d Daily Peak (5h%):", "codex", "42%"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("missing %q in graph output:\n%s", want, &out)
+		}
+	}
+}
+
+func jsonInt(v int64) string {
+	b, _ := json.Marshal(v)
+	return string(b)
+}

@@ -26,8 +26,11 @@ keisou run "テストを追加してリファクタリングする"
 よく使うオプション：
 
 ```powershell
-# 定期的に画面更新しながら残枠を監視
+# 定期的に画面更新しながら残枠・5h推移グラフ・上限到達予測(ETA)・7日間ピークを監視
 keisou status --watch
+
+# 推移グラフと7日間まとめを1回だけ表示したいとき
+keisou status --graph
 
 # 切替先を自動ではなく対話で選びたいとき
 keisou run --mode ask "タスク内容"
@@ -57,7 +60,7 @@ keisou help run
 
 | コマンド | 用途 | 主な例 |
 | :--- | :--- | :--- |
-| `keisou status` | 各ツールの 5時間枠・週間枠・モデルを横並び表示（API非消費） | `keisou status --json` / `keisou status --watch --interval 15` |
+| `keisou status` | 各ツールの 5時間枠・週間枠・モデルを横並び表示（API非消費。履歴は `config.json` と同じ場所の `history.jsonl` に直近7日分を自動保存） | `keisou status --watch` / `keisou status --graph` / `keisou status --json` |
 | `keisou run` | しきい値（5h / 週間）監視つきで実行し、上限到達時に引き継ぎリレー | `keisou run --agent claude --prompt-file task.txt` / `keisou run --no-wait "..."` |
 | `keisou handoff` | 現在の `git` 差分と直近ログから手動で `HANDOFF.md` を生成（API非消費） | `keisou handoff --agent codex --task "残タスクの引き継ぎ"` |
 | `keisou init` | デフォルトの `config.json` を生成し、CLI・ログパスを診断 | `keisou init` / `keisou init --force` |
