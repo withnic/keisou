@@ -167,6 +167,16 @@ func TestStatusGraphAndHistoryPersistence(t *testing.T) {
 			t.Fatalf("missing %q in graph output:\n%s", want, &out)
 		}
 	}
+
+	// --quiet updates history.jsonl silently without printing to stdout.
+	out.Reset()
+	diagnostics.Reset()
+	if code := run(context.Background(), []string{"status", "--config", path, "--quiet"}, &out, &diagnostics); code != 0 {
+		t.Fatalf("status --quiet exit %d: %s", code, &diagnostics)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected empty stdout for --quiet, got:\n%s", &out)
+	}
 }
 
 func jsonInt(v int64) string {

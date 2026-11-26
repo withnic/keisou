@@ -26,45 +26,63 @@ func truncateBytesUTF8(data []byte, limit int) string {
 }
 
 // RecentLogTail samples the end of the latest local session for manual handoff.
-func RecentLogTail(ctx context.Context, id model.ProviderID, configuredDir string) (string, error) {
+func RecentLogTail(ctx context.Context, id model.ProviderID, configuredDir string, extraDirs ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
-	dir, err := infra.ProviderDataDir(id, configuredDir)
+	dirs, err := infra.ProviderDataDirs(id, configuredDir, extraDirs)
 	if err != nil {
 		return "", err
-	}
-	extension := ".jsonl"
-	switch id {
-	case model.ProviderClaude:
-		dir = filepath.Join(dir, "projects")
-	case model.ProviderCodex:
-		dir = filepath.Join(dir, "sessions")
-	case model.ProviderGemini:
-		dir, extension = filepath.Join(dir, "tmp"), ".json"
-	case model.ProviderAntigravity:
-		dir = filepath.Join(dir, "brain")
 	}
 	var path string
 	var latest time.Time
 	var scanErr error
-	err = walk(ctx, dir, time.Time{}, func(path string) bool {
+	for idx, baseDir := range dirs {
+		if idx > 0 {
+			info, statErr := os.Stat(baseDir)
+			if statErr != nil || !info.IsDir() {
+				continue
+			}
+		}
+		dir := baseDir
+		extension := ".jsonl"
 		switch id {
+		case model.ProviderClaude:
+			dir = filepath.Join(dir, "projects")
+		case model.ProviderCodex:
+			dir = filepath.Join(dir, "sessions")
 		case model.ProviderGemini:
-			return filepath.Ext(path) == extension && filepath.Base(filepath.Dir(path)) == "chats"
+			dir, extension = filepath.Join(dir, "tmp"), ".json"
 		case model.ProviderAntigravity:
-			return filepath.Base(path) == "transcript.jsonl"
-		default:
-			return filepath.Ext(path) == extension
+			dir = filepath.Join(dir, "brain")
 		}
-	}, func(candidate string) {
-		// WalkDir order breaks ties reproducibly.
-		info, err := os.Lstat(candidate)
-		if err != nil {
-			scanErr = err
-		} else if info.ModTime().After(latest) {
-			latest, path = info.ModTime(), candidate
+		walkErr := walk(ctx, dir, time.Time{}, func(candidate string) bool {
+			switch id {
+			case model.ProviderGemini:
+				return filepath.Ext(candidate) == extension && filepath.Base(filepath.Dir(candidate)) == "chats"
+			case model.ProviderAntigravity:
+				return filepath.Base(candidate) == "transcript.jsonl"
+			default:
+				return filepath.Ext(candidate) == extension
+			}
+		}, func(candidate string) {
+			// WalkDir order breaks ties reproducibly.
+			info, statErr := os.Lstat(candidate)
+			if statErr != nil {
+				if idx == 0 {
+					scanErr = statErr
+				}
+			} else if info.ModTime().After(latest) {
+				latest, path = info.ModTime(), candidate
+			}
+		}, func(wErr error) {
+			if idx == 0 {
+				scanErr = wErr
+			}
+		})
+		if idx == 0 && walkErr != nil {
+			err = walkErr
 		}
-	}, func(err error) { scanErr = err })
+	}
 	if err != nil || path == "" {
 		if err == nil {
 			err = scanErr

@@ -103,6 +103,11 @@ keisou help run
     "codex": {
       "enabled": true,
       "priority": 2, // Codex はログ内の実測値（log_exact）を自動使用
+      // Windows と WSL2 の両方で使う場合は、もう片方のログディレクトリを追加指定すると合算・最新値反映
+      "extra_data_dirs": [
+        // WSL2 側から Windows 側を読む例: "/mnt/c/Users/<name>/.codex"
+        // Windows 側から WSL2 側を読む例: "\\\\wsl.localhost\\Ubuntu\\home\\<name>\\.codex"
+      ],
     },
     "gemini": {
       "enabled": false, // 使わないツールは false にするとリレー候補から除外
@@ -138,9 +143,22 @@ keisou help run
 
 既存のステータスラインスクリプトから呼び出す場合は `--quiet` を付けると標準出力を抑止してキャッシュのみ更新します。なお、`statusLine` は主に対話セッション（`claude`）の応答時に更新されるため、非対話（`claude -p`）単体実行中などはローカル推定および `429` 検知で動作します。
 
-### 3. ログディレクトリの環境変数オーバーライド（WSL2 等）
+### 3. Windows / WSL2 併用とバックグラウンド自動記録（任意）
 
-各プロバイダのデータディレクトリは、環境変数 `KEISOU_CLAUDE_DIR` / `KEISOU_CODEX_DIR` / `KEISOU_GEMINI_DIR` / `KEISOU_ANTIGRAVITY_DIR` → `config.json` の `data_dir` → ホーム配下既定（`~/.claude` / `~/.codex` / `~/.gemini` / `~/.gemini/antigravity-cli`）の順で解決されます。WSL2 から Windows 側のログディレクトリを参照する際にも利用できます。
+- **設定・7日間履歴の共有**: `history.jsonl` は `config.json` と同じディレクトリに保存されるため、WSL2 側で `export KEISOU_CONFIG="/mnt/c/Users/<name>/AppData/Roaming/keisou/config.json"` を設定すると設定と履歴を共有できます。
+- **複数ログディレクトリの合算**: Windows と WSL2 の両方で CLI を使う場合は、各プロバイダの `extra_data_dirs`（または環境変数 `KEISOU_<PROVIDER>_EXTRA_DIRS`、区切り文字は Windows `;` / Unix `:`）にもう片方のディレクトリを指定してください。未起動・未存在の追加ディレクトリは安全にスキップされます。主ディレクトリ単体の差し替えには `KEISOU_CLAUDE_DIR` / `KEISOU_CODEX_DIR` / `KEISOU_GEMINI_DIR` / `KEISOU_ANTIGRAVITY_DIR` を利用できます。
+- **`keisou` を起動し忘れても 7日間グラフを育てる（`keisou status --quiet`）**:
+  OS の定期実行で 5 分おきに `keisou status --quiet` を回しておくと、API 枠を消費せず `history.jsonl` だけ静かに蓄積され、好きなタイミングで `keisou status --graph` / `--watch` を開いた瞬間から推移・ETA・7日間ピークを確認できます。
+
+```powershell
+# Windows タスクスケジューラ（5分おきにバックグラウンド記録）
+schtasks /Create /SC MINUTE /MO 5 /TN "keisou-history" /TR "keisou status --quiet" /F
+```
+
+```sh
+# WSL2 / Linux / macOS（crontab -e に追記）
+*/5 * * * * keisou status --quiet
+```
 
 ---
 

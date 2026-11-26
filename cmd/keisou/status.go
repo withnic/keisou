@@ -23,10 +23,11 @@ func status(ctx context.Context, args []string, defaultPath string, stdout, stde
 	machine := flags.Bool("json", false, "output JSON array (or NDJSON with --watch) to stdout")
 	watch := flags.Bool("watch", false, "refresh periodically with 5h trend, limit ETA, and 7d graph until interrupted")
 	graph := flags.Bool("graph", false, "show 5h trend sparkline, limit ETA, and 7d daily peak graph (auto-enabled with --watch)")
+	quiet := flags.Bool("quiet", false, "record snapshot to 7-day history.jsonl without printing to stdout (ideal for cron/Task Scheduler)")
 	interval := flags.Int64("interval", 0, "refresh interval in seconds (default: config poll_interval_sec)")
 	flags.Usage = func() {
 		fmt.Fprint(stderr, `Usage:
-  keisou status [--json] [--watch] [--graph] [--interval sec] [--config path]
+  keisou status [--json] [--watch] [--graph] [--quiet] [--interval sec] [--config path]
 
 Display 5h and weekly quota usage from local logs without calling external LLM APIs.
 Values suffixed with (est) are local estimates; exact server values have no suffix.
@@ -68,7 +69,7 @@ Flags:
 			entries = loaded
 		}
 	}
-	if *watch && !*machine {
+	if *watch && !*machine && !*quiet {
 		restore := infra.EnableTerminalSequences(stdout)
 		defer restore()
 	}
@@ -86,7 +87,9 @@ Flags:
 			}
 			entries = updated
 		}
-		if *machine {
+		if *quiet {
+			err = nil
+		} else if *machine {
 			err = encoder.Encode(snapshots)
 		} else {
 			if *watch {

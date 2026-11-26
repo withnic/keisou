@@ -281,7 +281,7 @@ func (e Engine) ManualHandoff(ctx context.Context, dir, task string, id model.Pr
 		if a, ok := e.Collector.Adapter(id); ok {
 			usage = (provider.Collector{Adapters: []provider.ProviderAdapter{a}}).Collect(ctx, e.Clock.Now())[0]
 		}
-		tail, err := provider.RecentLogTail(ctx, id, e.Config.Providers[id].DataDir)
+		tail, err := provider.RecentLogTail(ctx, id, e.Config.Providers[id].DataDir, e.Config.Providers[id].ExtraDataDirs...)
 		if err != nil {
 			out := e.Diagnostic
 			if out == nil {

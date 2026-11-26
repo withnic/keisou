@@ -60,6 +60,7 @@ type ProviderConfig struct {
 	Args                []string `json:"args"`
 	HandoffArgs         []string `json:"handoff_args,omitempty"`
 	DataDir             string   `json:"data_dir"`
+	ExtraDataDirs       []string `json:"extra_data_dirs,omitempty"`
 	PlanName            string   `json:"plan_name"`
 	Est5hTokenLimit     int64    `json:"est_5h_token_limit"`
 	Est5hReqLimit       int      `json:"est_5h_req_limit"`

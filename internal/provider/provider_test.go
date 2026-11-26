@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -460,5 +461,67 @@ func TestLocalWeeklyTokenEstimation(t *testing.T) {
 	if s.RecentTokens5h != 50 || s.Window5hUsedPct != 5 || s.RecentTokensWeekly != 300 ||
 		s.WeeklyUsedPct == nil || *s.WeeklyUsedPct != 30 || s.ActiveModel != "m-now" {
 		t.Fatalf("weekly estimation snapshot = %+v, want 5h=50(5%%) weekly=300(30%%)", s)
+	}
+}
+
+func TestExtraDataDirsAggregationAndRecentLogTail(t *testing.T) {
+	// 1. Codex: newer exact rate_limits from extra dir overrides older primary dir.
+	codexWin := t.TempDir()
+	codexWSL := t.TempDir()
+	resetUnix := testNow.Add(3 * time.Hour).Unix()
+	logFile(t, codexWin, "sessions/2026/11/25/win.jsonl",
+		[]byte(`{"timestamp":"2026-11-25T23:00:00Z","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":20,"resets_at":`+strconv.FormatInt(resetUnix, 10)+`}}}}`+"\n"),
+		testNow.Add(-time.Hour))
+	logFile(t, codexWSL, "sessions/2026/11/25/wsl.jsonl",
+		[]byte(`{"timestamp":"2026-11-25T23:45:00Z","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":65,"resets_at":`+strconv.FormatInt(resetUnix, 10)+`}}}}`+"\n"),
+		testNow.Add(-15*time.Minute))
+
+	// 2. Claude: tokens and requests summed across primary + extra dir; missing extra dir skipped.
+	claudeWin := t.TempDir()
+	claudeWSL := t.TempDir()
+	missingExtra := filepath.Join(t.TempDir(), "wsl-stopped")
+	logFile(t, claudeWin, "projects/win/a.jsonl",
+		[]byte(`{"timestamp":"2026-11-25T23:10:00Z","type":"assistant","requestId":"req-win","message":{"role":"assistant","model":"claude-sonnet","usage":{"input_tokens":100,"output_tokens":50}}}`+"\n"),
+		testNow.Add(-50*time.Minute))
+	logFile(t, claudeWSL, "projects/wsl/b.jsonl",
+		[]byte(`{"timestamp":"2026-11-25T23:50:00Z","type":"assistant","requestId":"req-wsl","message":{"role":"assistant","model":"claude-opus","usage":{"input_tokens":200,"output_tokens":50}}}`+"\n"),
+		testNow.Add(-10*time.Minute))
+
+	for _, env := range []string{"KEISOU_CODEX_DIR", "KEISOU_CODEX_EXTRA_DIRS", "KEISOU_CLAUDE_DIR", "KEISOU_CLAUDE_EXTRA_DIRS"} {
+		t.Setenv(env, "")
+	}
+	cfg := model.Config{Providers: map[model.ProviderID]model.ProviderConfig{
+		model.ProviderCodex: {
+			Enabled:       true,
+			Command:       "codex",
+			DataDir:       codexWin,
+			ExtraDataDirs: []string{missingExtra, codexWSL},
+		},
+		model.ProviderClaude: {
+			Enabled:         true,
+			Command:         "claude",
+			DataDir:         claudeWin,
+			ExtraDataDirs:   []string{missingExtra, claudeWSL},
+			Est5hTokenLimit: 1000,
+			Est5hReqLimit:   100,
+		},
+	}}
+
+	collector := NewCollector(cfg, availableCLI)
+	codexAdapter, _ := collector.Adapter(model.ProviderCodex)
+	codexSnap := codexAdapter.FetchUsage(context.Background(), testNow)
+	if codexSnap.Source != model.SourceLogExact || codexSnap.Window5hUsedPct != 65 || codexSnap.ErrorMessage != "" {
+		t.Fatalf("codex multi-dir snapshot = %+v, want exact 65%% with no error", codexSnap)
+	}
+
+	claudeAdapter, _ := collector.Adapter(model.ProviderClaude)
+	claudeSnap := claudeAdapter.FetchUsage(context.Background(), testNow)
+	if claudeSnap.RecentTokens5h != 400 || claudeSnap.RecentReqs5h != 2 || claudeSnap.Window5hUsedPct != 40 || claudeSnap.ActiveModel != "claude-opus" || claudeSnap.ErrorMessage != "" {
+		t.Fatalf("claude multi-dir snapshot = %+v, want 400 tokens (40%%), 2 reqs, model claude-opus", claudeSnap)
+	}
+
+	tail, err := RecentLogTail(context.Background(), model.ProviderClaude, claudeWin, missingExtra, claudeWSL)
+	if err != nil || !strings.Contains(tail, "req-wsl") {
+		t.Fatalf("RecentLogTail(multi-dir) = %q, %v; want newer extra-dir entry req-wsl", tail, err)
 	}
 }

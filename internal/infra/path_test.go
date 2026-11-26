@@ -55,4 +55,16 @@ func TestPathExpansionAndProviderPriority(t *testing.T) {
 	if err != nil || got != agyEnv {
 		t.Fatalf("ProviderDataDir(antigravity env) = %q, %v; want %q", got, err, agyEnv)
 	}
+
+	extra1 := filepath.Join(t.TempDir(), "wsl-codex")
+	extra2 := filepath.Join(t.TempDir(), "other-codex")
+	t.Setenv("KEISOU_CODEX_DIR", agyEnv)
+	t.Setenv("KEISOU_CODEX_EXTRA_DIRS", extra1+string(os.PathListSeparator)+agyEnv)
+	dirs, err := ProviderDataDirs(model.ProviderCodex, "", []string{" ", extra2, extra1})
+	if err != nil {
+		t.Fatalf("ProviderDataDirs = %v", err)
+	}
+	if len(dirs) != 3 || dirs[0] != agyEnv || dirs[1] != extra1 || dirs[2] != extra2 {
+		t.Fatalf("ProviderDataDirs = %v, want [%s %s %s]", dirs, agyEnv, extra1, extra2)
+	}
 }

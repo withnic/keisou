@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -132,13 +133,28 @@ func (a adapter) fetch(ctx context.Context, now time.Time, baseline chan<- model
 		snapshot.ErrorMessage = fmt.Sprintf("resolve %s CLI: %v", a.id, err)
 	}
 	baseline <- snapshot
-	dir, err := infra.ProviderDataDir(a.id, a.config.DataDir)
+	dirs, err := infra.ProviderDataDirs(a.id, a.config.DataDir, a.config.ExtraDataDirs)
 	if err != nil {
 		snapshot.ErrorMessage = err.Error()
 		return snapshot
 	}
 	u := newUsage(now, a.config)
-	a.scan(ctx, dir, &u)
+	a.scan(ctx, dirs[0], &u)
+	for _, extraDir := range dirs[1:] {
+		if ctx.Err() != nil {
+			break
+		}
+		info, statErr := os.Stat(extraDir)
+		if statErr != nil || !info.IsDir() {
+			continue
+		}
+		prevErr := u.err
+		a.scan(ctx, extraDir, &u)
+		// Do not let an optional extra directory error mask a clean primary scan.
+		if prevErr == nil && u.err != nil {
+			u.err = nil
+		}
+	}
 	return u.snapshot(snapshot, a.config)
 }
 

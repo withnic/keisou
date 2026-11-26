@@ -73,3 +73,42 @@ func ProviderDataDir(id model.ProviderID, configured string) (string, error) {
 	}
 	return filepath.Join(home, "."+string(id)), nil
 }
+
+// ProviderDataDirs returns the primary provider data directory followed by any
+// deduplicated extra directories from KEISOU_<ID>_EXTRA_DIRS and config extra_data_dirs.
+func ProviderDataDirs(id model.ProviderID, configured string, extras []string) ([]string, error) {
+	primary, err := ProviderDataDir(id, configured)
+	if err != nil {
+		return nil, err
+	}
+	dirs := []string{primary}
+	seen := map[string]bool{primary: true}
+	appendDir := func(raw string) error {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			return nil
+		}
+		expanded, err := expandPath(trimmed)
+		if err != nil {
+			return err
+		}
+		if !seen[expanded] {
+			seen[expanded] = true
+			dirs = append(dirs, expanded)
+		}
+		return nil
+	}
+	if envExtras := os.Getenv("KEISOU_" + strings.ToUpper(string(id)) + "_EXTRA_DIRS"); envExtras != "" {
+		for _, item := range filepath.SplitList(envExtras) {
+			if err := appendDir(item); err != nil {
+				return nil, err
+			}
+		}
+	}
+	for _, item := range extras {
+		if err := appendDir(item); err != nil {
+			return nil, err
+		}
+	}
+	return dirs, nil
+}
